@@ -177,6 +177,13 @@ go build -o PromAI main.go
         </a>
     </td>
     <td align="center">
+        <a href="https://github.com/junlintianxiazhifulinzhongguo">
+            <img src="https://avatars.githubusercontent.com/u/18591729?v=4" width="100;" alt="junlintianxiazhifulinzhongguo"/>
+            <br />
+            <sub><b>junlintianxiazhifulinzhongguo</b></sub>
+        </a>
+    </td>
+    <td align="center">
         <a href="https://github.com/liushiju">
             <img src="https://avatars.githubusercontent.com/u/34912508?v=4" width="100;" alt="liushiju"/>
             <br />
