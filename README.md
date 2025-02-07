@@ -180,7 +180,7 @@ go build -o PromAI main.go
         <a href="https://github.com/junlintianxiazhifulinzhongguo">
             <img src="https://avatars.githubusercontent.com/u/18591729?v=4" width="100;" alt="junlintianxiazhifulinzhongguo"/>
             <br />
-            <sub><b>junlintianxiazhifulinzhongguo</b></sub>
+            <sub><b>Junlintianxiazhifulinzhongguo</b></sub>
         </a>
     </td>
     <td align="center">
