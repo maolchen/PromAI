@@ -41,11 +41,13 @@ type MetricData struct {
 type MetricGroup struct {
 	Type          string
 	MetricsByName map[string][]MetricData
+	MetricOrder   []string
 	Stats         GroupStats // 替换原来的 Average
 }
 type ReportData struct {
 	Timestamp    time.Time
 	MetricGroups map[string]*MetricGroup
+	GroupOrder   []string
 	ChartData    map[string]template.JS
 	Project      string
 }
@@ -62,6 +64,10 @@ func GetStatusText(status string) string {
 }
 
 func GenerateReport(data ReportData) (string, error) {
+	log.Printf("GroupOrder: %+v", data.GroupOrder)
+	for groupType, group := range data.MetricGroups {
+		log.Printf("Group [%s] MetricOrder: %+v", groupType, group.MetricOrder) // ✅ 这里应该不报错且有值
+	}
 	// 计算每个组的统计信息
 	for _, group := range data.MetricGroups {
 		stats := GroupStats{

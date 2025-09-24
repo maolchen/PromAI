@@ -15,6 +15,7 @@ type Config struct {
 	Notifications struct {
 		Dingtalk notify.DingtalkConfig `yaml:"dingtalk"`
 		Email    notify.EmailConfig    `yaml:"email"`
+		Wecom    notify.WeComConfig    `yaml:"wecom"`
 	} `yaml:"notifications"`
 	Port string `yaml:"port"`
 }

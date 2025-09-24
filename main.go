@@ -11,10 +11,10 @@ import (
 
 	"PromAI/pkg/config"
 	"PromAI/pkg/metrics"
+	"PromAI/pkg/notify"
 	"PromAI/pkg/prometheus"
 	"PromAI/pkg/report"
 	"PromAI/pkg/status"
-	"PromAI/pkg/notify"
 	"PromAI/pkg/utils"
 
 	"github.com/robfig/cron/v3"
@@ -100,7 +100,14 @@ func main() {
 				notify.SendEmail(config.Notifications.Email, reportFilePath)
 			}
 
-			
+			// ✅ 新增：企业微信通知
+			if config.Notifications.Wecom.Enabled {
+				log.Printf("发送企业微信消息")
+				if err := notify.SendWeCom(config.Notifications.Wecom, reportFilePath); err != nil {
+					log.Printf("发送企业微信消息失败: %v", err)
+				}
+			}
+
 		})
 
 		if err != nil {

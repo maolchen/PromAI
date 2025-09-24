@@ -40,16 +40,19 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 	data := &report.ReportData{
 		Timestamp:    time.Now(),
 		MetricGroups: make(map[string]*report.MetricGroup),
+		GroupOrder:   make([]string, 0, len(c.config.MetricTypes)),
 		ChartData:    make(map[string]template.JS),
-		Project:  c.config.ProjectName,
+		Project:      c.config.ProjectName,
 	}
 
 	for _, metricType := range c.config.MetricTypes {
 		group := &report.MetricGroup{
 			Type:          metricType.Type,
 			MetricsByName: make(map[string][]report.MetricData),
+			MetricOrder:   make([]string, 0, len(metricType.Metrics)),
 		}
 		data.MetricGroups[metricType.Type] = group
+		data.GroupOrder = append(data.GroupOrder, metricType.Type)
 
 		for _, metric := range metricType.Metrics {
 			result, _, err := c.Client.Query(ctx, metric.Query, time.Now())
@@ -111,6 +114,7 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 					metrics = append(metrics, metricData)
 				}
 				group.MetricsByName[metric.Name] = metrics
+				group.MetricOrder = append(group.MetricOrder, metric.Name)
 			}
 		}
 	}
