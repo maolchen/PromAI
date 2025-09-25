@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -44,12 +45,34 @@ type MetricGroup struct {
 	MetricOrder   []string
 	Stats         GroupStats // 替换原来的 Average
 }
+
+// 新增：主机资源聚合结构
+type DiskInfo struct {
+	MountPoint string
+	DiskTotal  float64
+	DiskUsed   float64
+	DiskUsage  float64
+}
+
+type HostSummary struct {
+	Hostname  string
+	IP        string
+	CPUCount  int64
+	CPUUsage  float64
+	MemTotal  float64
+	MemUsed   float64
+	MemUsage  float64
+	DiskData  []DiskInfo
+	Timestamp time.Time
+}
+
 type ReportData struct {
 	Timestamp    time.Time
 	MetricGroups map[string]*MetricGroup
 	GroupOrder   []string
 	ChartData    map[string]template.JS
 	Project      string
+	HostSummary  []HostSummary // 新增：主机资源汇总
 }
 
 func GetStatusText(status string) string {
@@ -61,6 +84,34 @@ func GetStatusText(status string) string {
 	default:
 		return "正常"
 	}
+}
+
+// 新增：字节格式化函数
+func formatBytes(bytes float64) string {
+	if bytes == 0 {
+		return "0 B"
+	}
+
+	unitPrefixes := []string{"B", "KB", "MB", "GB", "TB"}
+	const unitSize = 1024
+
+	unitIndex := 0
+	floatBytes := float64(bytes)
+
+	for floatBytes >= unitSize && unitIndex < len(unitPrefixes)-1 {
+		floatBytes /= unitSize
+		unitIndex++
+	}
+
+	return fmt.Sprintf("%.2f %s", floatBytes, unitPrefixes[unitIndex])
+}
+
+// 新增：提取IP地址函数，从instance:9100 提取
+func extractIP(instance string) string {
+	if idx := strings.LastIndex(instance, ":"); idx != -1 {
+		return instance[:idx]
+	}
+	return instance
 }
 
 func GenerateReport(data ReportData) (string, error) {
@@ -174,11 +225,110 @@ func GenerateReport(data ReportData) (string, error) {
 		data.ChartData[key] = template.JS(valuesJSON)
 	}
 
-	// 生成报告
-	tmpl, err := template.ParseFiles("templates/report.html")
+	// 按主机聚合数据
+	hostMap := make(map[string]*HostSummary)
+	for _, group := range data.MetricGroups {
+		for metricName, metrics := range group.MetricsByName {
+			for _, m := range metrics {
+				var instance string
+				for _, label := range m.Labels {
+					if label.Name == "instance" {
+						instance = label.Value
+						break
+					}
+				}
+				if instance == "" {
+					continue
+				}
+
+				if _, exists := hostMap[instance]; !exists {
+					hostMap[instance] = &HostSummary{
+						Hostname:  instance,
+						IP:        extractIP(instance),
+						DiskData:  make([]DiskInfo, 0),
+						Timestamp: m.Timestamp,
+					}
+				}
+
+				host := hostMap[instance]
+
+				// 更新最新时间戳
+				if m.Timestamp.After(host.Timestamp) {
+					host.Timestamp = m.Timestamp
+				}
+
+				log.Printf("Processing metric: %s from instance %s, value: %f", metricName, instance, m.Value)
+				// 根据指标名填充数据
+				switch metricName {
+				case "CPU使用率":
+					host.CPUUsage = m.Value
+				case "CPU核心数":
+					host.CPUCount = int64(m.Value)
+				case "内存总量":
+					host.MemTotal = m.Value
+				case "内存使用量":
+					host.MemUsed = m.Value
+					if host.MemTotal > 0 {
+						host.MemUsage = (host.MemUsed / host.MemTotal) * 100
+					}
+				case "磁盘总量", "磁盘可用量":
+					var mountPoint string
+					for _, label := range m.Labels {
+						if label.Name == "mountpoint" {
+							mountPoint = label.Value
+							break
+						}
+					}
+					if mountPoint == "" {
+						continue
+					}
+
+					var disk *DiskInfo
+					for i := range host.DiskData {
+						if host.DiskData[i].MountPoint == mountPoint {
+							disk = &host.DiskData[i]
+							break
+						}
+					}
+					if disk == nil {
+						host.DiskData = append(host.DiskData, DiskInfo{MountPoint: mountPoint})
+						disk = &host.DiskData[len(host.DiskData)-1]
+					}
+
+					if metricName == "磁盘总量" {
+						disk.DiskTotal = m.Value
+					} else if metricName == "磁盘可用量" {
+						disk.DiskUsed = disk.DiskTotal - m.Value
+						if disk.DiskTotal > 0 {
+							disk.DiskUsage = (disk.DiskUsed / disk.DiskTotal) * 100
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 转换为切片
+	data.HostSummary = make([]HostSummary, 0, len(hostMap))
+	for _, h := range hostMap {
+		data.HostSummary = append(data.HostSummary, *h)
+	}
+
+	// // ✅ 注册模板函数
+	funcMap := template.FuncMap{
+		"formatBytes": formatBytes,
+	}
+
+	tmpl, err := template.New("report.html").Funcs(funcMap).ParseFiles("templates/report.html")
 	if err != nil {
 		return "", fmt.Errorf("parsing template: %w", err)
 	}
+
+	// // 生成报告
+	// tmpl, err := template.ParseFiles("templates/report.html")
+	// if err != nil {
+	// 	return "", fmt.Errorf("parsing template: %w", err)
+	// }
 
 	// 创建输出文件
 	filename := fmt.Sprintf("reports/inspection_report_%s.html", time.Now().Format("20060102_150405"))
@@ -194,6 +344,10 @@ func GenerateReport(data ReportData) (string, error) {
 	}
 
 	// log.Println("Report generated successfully:", filename)
+	for _, h := range data.HostSummary {
+		log.Printf("Host: %s, CPUCount: %d, MemTotal: %f, MemUsed: %f, DiskData: %d",
+			h.Hostname, h.CPUCount, h.MemTotal, h.MemUsed, len(h.DiskData))
+	}
 	log.Printf("项目[%s]报告生成成功: %s", data.Project, filename)
 
 	return filename, nil // 添加返回语句
