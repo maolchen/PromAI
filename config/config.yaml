@@ -2,7 +2,7 @@ prometheus_url: "http://10.1.114.50:8390"
 
 project_name: "测试项目巡检报告"
 
-# 定时任务：每天9点半和17半执行
+# 定时任务：每天９点半和１７半执行
 
 cron_schedule: "30 9,17 * * *"
 
@@ -41,6 +41,7 @@ metric_types:
 - type: "基础资源使用情况"
   metrics:
   - name: "CPU使用率"
+    type: "monitoring"
     description: "节点CPU使用率统计"
     query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
     threshold: 80
@@ -50,6 +51,7 @@ metric_types:
       instance: "节点"
 
   - name: "CPU核心数"
+    type: "display"
     query: "count by (instance) (node_cpu_seconds_total{mode='idle'})"
     description: "节点CPU核心数统计"
     unit: "core"
@@ -57,6 +59,7 @@ metric_types:
       instance: "节点"
 
   - name: "内存总量"
+    type: "display"
     query: "node_memory_MemTotal_bytes"
     description: "节点内存总量统计"
     unit: "B"
@@ -64,6 +67,7 @@ metric_types:
       instance: "节点"
 
   - name: "内存使用量"
+    type: "display"
     query: "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes"
     description: "节点内存使用量统计"
     unit: "B"
@@ -71,6 +75,7 @@ metric_types:
       instance: "节点"
 
   - name: "内存使用率"
+    type: "monitoring"
     description: "节点内存使用率统计"
     query: "100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)"
     threshold: 85
@@ -80,6 +85,7 @@ metric_types:
       instance: "节点"
 
   - name: "磁盘总量"
+    type: "display"
     query: >-
       node_filesystem_size_bytes{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"} * on(instance) group_left(nodename) node_uname_info
     description: "节点磁盘总量统计"
@@ -91,6 +97,7 @@ metric_types:
       nodename: "节点名称"
 
   - name: "磁盘可用量"
+    type: "display"
     query: >-
       node_filesystem_avail_bytes{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"} * on(instance) group_left(nodename) node_uname_info
     description: "节点磁盘可用量统计"
@@ -102,6 +109,7 @@ metric_types:
       nodename: "节点名称"
 
   - name: "磁盘使用率"
+    type: "monitoring"
     description: "节点磁盘使用率统计"
     query: >-
       (((100 -((node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes)) and ON (instance, device, mountpoint) node_filesystem_readonly{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"}== 0) + on(instance) group_left(node_uname_info) node_uname_info) * on(instance) group_left(nodename) node_uname_info
@@ -113,6 +121,75 @@ metric_types:
       mountpoint: "挂载点"
       device: "磁盘"
       nodename: "节点名称"
+
+  # 新增展示类指标
+  - name: "运行时间"
+    type: "display"
+    description: "系统运行时长统计"
+    query: "time() - node_boot_time_seconds"
+    unit: "s"
+    labels:
+      instance: "节点"
+
+  - name: "5分钟负载"
+    type: "display"
+    description: "系统5分钟平均负载"
+    query: "node_load5"
+    unit: ""
+    labels:
+      instance: "节点"
+
+  - name: "30分钟内磁盘平均读取值"
+    type: "display"
+    description: "30分钟内磁盘平均读取速率"
+    query: 'avg_over_time(rate(node_disk_read_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m])'
+    unit: "B/s"
+    labels:
+      instance: "节点"
+      device: "设备"
+
+  - name: "30分钟内磁盘平均写入值"
+    type: "display"
+    description: "30分钟内磁盘平均写入速率"
+    query: 'avg_over_time(rate(node_disk_written_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m])'
+    unit: "B/s"
+    labels:
+      instance: "节点"
+      device: "设备"
+
+  - name: "TCP连接数"
+    type: "display"
+    description: "当前活跃的TCP连接总数"
+    query: "node_netstat_Tcp_CurrEstab"
+    unit: "个"
+    labels:
+      instance: "节点"
+
+  - name: "TCP_TW数"
+    type: "display"
+    description: "TCP TIME_WAIT状态连接数"
+    query: "node_sockstat_TCP_tw"
+    unit: "个"
+    labels:
+      instance: "节点"
+
+  - name: "30分钟内下载速率"
+    type: "display"
+    description: "30分钟内网络平均下载速率"
+    query: 'avg_over_time(rate(node_network_receive_bytes_total{device=~"eth.*|ens.*"}[5m])[30m:1m])'
+    unit: "B/s"
+    labels:
+      instance: "节点"
+      device: "设备"
+
+  - name: "30分钟内上传速率"
+    type: "display"
+    description: "30分钟内网络平均上传速率"
+    query: 'avg_over_time(rate(node_network_transmit_bytes_total{device=~"eth.*|ens.*"}[5m])[30m:1m])'
+    unit: "B/s"
+    labels:
+      instance: "节点"
+      device: "设备"
   # - name: "固定机器内存使用率"
   #   description: "固定机器内存使用率统计"
   #   query: >-
@@ -164,6 +241,7 @@ metric_types:
   #     script: "脚本名称"
 
   - name: "节点就绪状态"
+    type: "monitoring"
     description: "K8s节点就绪状态检查"
     query: "kube_node_status_condition{condition='Ready',status!='true'}"
     threshold: 0
@@ -174,6 +252,7 @@ metric_types:
       condition: "状态类型"
 
   - name: "Pod运行状态"
+    type: "monitoring"
     description: "集群Pod运行状态统计"
     query: "sum by (namespace, pod) (kube_pod_status_phase{phase='Running'})"
     threshold: 1
@@ -184,6 +263,7 @@ metric_types:
       pod: "Pod名称"
 
   - name: "PVC使用率"
+    type: "monitoring"
     description: "持久化存储使用率"
     query: >-
       100 * (1 - kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes)

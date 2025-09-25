@@ -224,6 +224,7 @@
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+        /* 行级状态样式（向后兼容，但在主机资源表格中不再使用） */
         tr.critical {
             background-color: #ffe6e6 !important;
         }
@@ -241,6 +242,22 @@
             height: 400px;
             margin: 20px 0;
         }
+        /* 单元格级状态样式（用于精确标识异常指标） */
+        td.critical { 
+            background-color: #ffe6e6 !important;
+            color: #e60e24;
+            font-weight: bold;
+        }
+        td.warning { 
+            background-color: #fff3cd !important;
+            color: #f3a807;
+            font-weight: bold;
+        }
+        td.normal {
+            /* 保持默认样式 */
+        }
+        
+        /* 保持原有的通用样式用于其他地方 */
         .critical { color: #dc3545; }
         .warning { color: #ffc107; }
 
@@ -336,13 +353,7 @@
             {{range $host := .HostSummary}}
                 {{if gt (len $host.DiskData) 0}}
                     {{range $i, $disk := $host.DiskData}}
-                        <tr 
-                            {{if or (ge $host.CPUUsage 90) (ge $host.MemUsage 90) (ge $disk.DiskUsage 90)}}
-                                class="critical"
-                            {{else if or (ge $host.CPUUsage 80) (ge $host.MemUsage 85) (ge $disk.DiskUsage 80)}}
-                                class="warning"
-                            {{end}}
-                        >
+                        <tr>
                             {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{$host.Hostname}}</td>{{end}}
                             {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{$host.IP}}</td>{{end}}
                             {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{printf "%.0f" $host.CPUCount}}</td>{{end}}
@@ -378,13 +389,7 @@
                     {{end}}
                 {{else}}
                     <!-- 无磁盘数据时 -->
-                    <tr 
-                        {{if or (ge $host.CPUUsage 90) (ge $host.MemUsage 90)}}
-                            class="critical"
-                        {{else if or (ge $host.CPUUsage 80) (ge $host.MemUsage 85)}}
-                            class="warning"
-                        {{end}}
-                    >
+                    <tr>
                         <td>{{$host.Hostname}}</td>
                         <td>{{$host.IP}}</td>
                         <td>{{printf "%.0f" $host.CPUCount}}</td>

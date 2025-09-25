@@ -1,11 +1,8 @@
 module PromAI
 
-go 1.24
-
-toolchain go1.24.7
+go 1.23.0
 
 require (
-	github.com/SebastiaanKlippert/go-wkhtmltopdf v1.9.3
 	github.com/jordan-wright/email v4.0.1-0.20210109023952-943e75fe5223+incompatible
 	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/common v0.61.0

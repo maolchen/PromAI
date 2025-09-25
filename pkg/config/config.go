@@ -27,6 +27,7 @@ type MetricType struct {
 
 type MetricConfig struct {
 	Name          string            `yaml:"name"`
+	Type          string            `yaml:"type"`
 	Description   string            `yaml:"description"`
 	Query         string            `yaml:"query"`
 	Threshold     float64           `yaml:"threshold"`

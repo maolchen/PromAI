@@ -186,9 +186,9 @@
         }
         .stats {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
+            grid-template-columns: repeat(1, 1fr);
+            gap: 15px;
+            margin-top: 15px;
         }
         .stat-item {
             text-align: center;
@@ -221,7 +221,7 @@
             text-align: center;
         }
         th {
-            background-color: #0ee656;
+            background-color: #d1a8f3;
             position: sticky;
             color: white;
             top: 0;
@@ -229,6 +229,7 @@
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+        /* 行级状态样式（向后兼容，但在主机资源表格中不再使用） */
         tr.critical {
             background-color: #ffe6e6 !important;
         }
@@ -246,12 +247,28 @@
             height: 400px;
             margin: 20px 0;
         }
+        /* 单元格级状态样式（用于精确标识异常指标） */
+        td.critical { 
+            background-color: #ffe6e6 !important;
+            color: #e60e24;
+            font-weight: bold;
+        }
+        td.warning { 
+            background-color: #fff3cd !important;
+            color: #f3a807;
+            font-weight: bold;
+        }
+        td.normal {
+            /* 保持默认样式 */
+        }
+        
+        /* 保持原有的通用样式用于其他地方 */
         .critical { 
-            background-color:rgb(238, 157, 157);
+            background-color: #ffe6e6 !important;
             color: #e60e24; 
         }
         .warning { 
-            background-color:rgb(222, 231, 97);
+            background-color: #fff3cd !important;
             color: #f3a807; 
         }
         /* 响应式支持 */
@@ -285,25 +302,16 @@
                 <h3>{{$type}}</h3>
                 <div class="stats">
                     <div class="stat-item">
-                        <div class="label">最大值</div>
-                        <div class="value">{{printf "%.2f" $group.Stats.MaxValue}}</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="label">最小值</div>
-                        <div class="value">{{printf "%.2f" $group.Stats.MinValue}}</div>
-                    </div>
-                    <!-- <div class="stat-item">
-                        <div class="label">平均值</div>
-                        <div class="value">{{printf "%.2f" $group.Stats.Average}}</div>
-                    </div> -->
-                    <div class="stat-item">
-                        <div class="label">告警数</div>
+                        <div class="label" style="font-size: 16px;">告警数/收集指标总数</div>
                         <div class="value {{if gt $group.Stats.AlertCount 0}}alert{{end}}">
-                            {{$group.Stats.AlertCount}}/{{$group.Stats.TotalCount}}
+                            <span style="color: {{if gt $group.Stats.AlertCount 0}}red{{else}}inherit{{end}}; font-size: larger;">
+                        {{$group.Stats.AlertCount}}
+                    </span>
+                    <span style="color: rgb(14, 155, 14); font-size: larger;">/{{$group.Stats.TotalCount}}</span>
                         </div>
                     </div>
                     <div class="stat-item">
-                        <div class="label">告警详情</div>
+                        <div class="label" style="font-size: 16px;">告警详情</div>
                         <div class="value">
                             <span class="critical">严重:{{$group.Stats.CriticalCount}}</span>
                             <span class="warning">警告:{{$group.Stats.WarningCount}}</span>
@@ -331,6 +339,8 @@
                         <th>IP地址</th>
                         <th>CPU核心数</th>
                         <th>CPU使用率</th>
+                        <th>运行时间</th>
+                        <th>5分钟负载</th>
                         <th>内存总量</th>
                         <th>内存使用量</th>
                         <th>内存使用率</th>
@@ -338,6 +348,12 @@
                         <th>磁盘总量</th>
                         <th>磁盘使用量</th>
                         <th>磁盘使用率</th>
+                        <!-- <th>磁盘平均读取</th> -->
+                        <!-- <th>磁盘平均写入</th> -->
+                        <th>TCP连接数</th>
+                        <th>TCP_TW数</th>
+                        <!-- <th>下载速率</th> -->
+                        <!-- <th>上传速率</th> -->
                         <th>检测时间</th>
                     </tr>
                 </thead>
@@ -345,71 +361,95 @@
                     {{range $host := .HostSummary}}
                         {{if gt (len $host.DiskData) 0}}
                             {{range $i, $disk := $host.DiskData}}
-                                <tr 
-                                    {{if or (ge $host.CPUUsage 90.0) (ge $host.MemUsage 90.0) (ge $disk.DiskUsage 90.0)}}
-                                        class="critical"
-                                    {{else if or (ge $host.CPUUsage 80.0) (ge $host.MemUsage 85.0) (ge $disk.DiskUsage 80.0)}}
-                                        class="warning"
-                                    {{end}}
-                                >
+                                <tr>
                                     {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{$host.IP}}</td>{{end}}
                                     {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{$host.CPUCount}}</td>{{end}}
                                     {{if eq $i 0}}
-                                        <td rowspan="{{len $host.DiskData}}" 
-                                            {{if ge $host.CPUUsage 90.0}}class="critical"
-                                            {{else if ge $host.CPUUsage 5.0}}class="warning"
-                                            {{end}}>
+                                        <td rowspan="{{len $host.DiskData}}" class="{{$host.CPUStatus}}">
                                             {{printf "%.2f%%" $host.CPUUsage}}
                                         </td>
                                     {{end}}
+                                    {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{formatUptime $host.Uptime}}</td>{{end}}
+                                    {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{printf "%.2f" $host.Load5}}</td>{{end}}
                                     {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{formatBytes $host.MemTotal}}</td>{{end}}
                                     {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{formatBytes $host.MemUsed}}</td>{{end}}
                                     {{if eq $i 0}}
-                                        <td rowspan="{{len $host.DiskData}}" 
-                                            {{if ge $host.MemUsage 85.0}}class="critical"
-                                            {{else if ge $host.MemUsage 70.0}}class="warning"
-                                            {{end}}>
+                                        <td rowspan="{{len $host.DiskData}}" class="{{$host.MemStatus}}">
                                             {{printf "%.2f%%" $host.MemUsage}}
                                         </td>
                                     {{end}}
                                     <td>{{$disk.MountPoint}}</td>
                                     <td>{{formatBytes $disk.DiskTotal}}</td>
                                     <td>{{formatBytes $disk.DiskUsed}}</td>
-                                    <td 
-                                        {{if ge $disk.DiskUsage 85.0}}class="critical"
-                                        {{else if ge $disk.DiskUsage 78.0}}class="warning"
-                                        {{end}}>
+                                    <td class="{{$disk.Status}}">
                                         {{printf "%.2f%%" $disk.DiskUsage}}
                                     </td>
+                                    {{/* 新增：显示磁盘IO统计 */}}
+                                    {{if eq $i 0}}
+                                        <!-- <td rowspan="{{len $host.DiskData}}">
+                                            {{range $diskIO := $host.DiskIOStats}}
+                                                {{$diskIO.Device}}: {{formatRate $diskIO.AvgReadRate}}<br>
+                                            {{end}}
+                                        </td>
+                                        <td rowspan="{{len $host.DiskData}}">
+                                            {{range $diskIO := $host.DiskIOStats}}
+                                                {{$diskIO.Device}}: {{formatRate $diskIO.AvgWriteRate}}<br>
+                                            {{end}}
+                                        </td> -->
+                                        <td rowspan="{{len $host.DiskData}}">{{formatNumber $host.TCPConnections}}</td>
+                                        <td rowspan="{{len $host.DiskData}}">{{formatNumber $host.TCPTimeWait}}</td>
+                                        <!-- <td rowspan="{{len $host.DiskData}}">
+                                            {{range $netIO := $host.NetworkStats}}
+                                                {{$netIO.Interface}}: {{formatRate $netIO.AvgDownloadRate}}<br>
+                                            {{end}}
+                                        </td>
+                                        <td rowspan="{{len $host.DiskData}}">
+                                            {{range $netIO := $host.NetworkStats}}
+                                                {{$netIO.Interface}}: {{formatRate $netIO.AvgUploadRate}}<br>
+                                            {{end}}
+                                        </td> -->
+                                    {{end}}
                                     {{if eq $i 0}}<td rowspan="{{len $host.DiskData}}">{{$host.Timestamp.Format "2006-01-02 15:04:05"}}</td>{{end}}
                                 </tr>
                             {{end}}
                         {{else}}
                             <!-- 无磁盘数据时 -->
-                            <tr 
-                                {{if or (ge $host.CPUUsage 90.0) (ge $host.MemUsage 90.0)}}
-                                    class="critical"
-                                {{else if or (ge $host.CPUUsage 80.0) (ge $host.MemUsage 85.0)}}
-                                    class="warning"
-                                {{end}}
-                            >
+                            <tr>
                                 <td>{{$host.IP}}</td>
                                 <td>{{printf "%.0f" $host.CPUCount}}</td>
-                                <td 
-                                    {{if ge $host.CPUUsage 90.0}}class="critical"
-                                    {{else if ge $host.CPUUsage 80.0}}class="warning"
-                                    {{end}}>
+                                <td class="{{$host.CPUStatus}}">
                                     {{printf "%.2f%%" $host.CPUUsage}}
                                 </td>
+                                <td>{{formatUptime $host.Uptime}}</td>
+                                <td>{{printf "%.2f" $host.Load5}}</td>
                                 <td>{{formatBytes $host.MemTotal}}</td>
                                 <td>{{formatBytes $host.MemUsed}}</td>
-                                <td 
-                                    {{if ge $host.MemUsage 90.0}}class="critical"
-                                    {{else if ge $host.MemUsage 85.0}}class="warning"
-                                    {{end}}>
+                                <td class="{{$host.MemStatus}}">
                                     {{printf "%.2f%%" $host.MemUsage}}
                                 </td>
                                 <td colspan="4">无磁盘数据</td>
+                                <!-- <td>
+                                    {{range $diskIO := $host.DiskIOStats}}
+                                        {{$diskIO.Device}}: {{formatRate $diskIO.AvgReadRate}}<br>
+                                    {{end}}
+                                </td>
+                                <td>
+                                    {{range $diskIO := $host.DiskIOStats}}
+                                        {{$diskIO.Device}}: {{formatRate $diskIO.AvgWriteRate}}<br>
+                                    {{end}}
+                                </td> -->
+                                <td>{{formatNumber $host.TCPConnections}}</td>
+                                <td>{{formatNumber $host.TCPTimeWait}}</td>
+                                <!-- <td>
+                                    {{range $netIO := $host.NetworkStats}}
+                                        {{$netIO.Interface}}: {{formatRate $netIO.AvgDownloadRate}}<br>
+                                    {{end}}
+                                </td>
+                                <td>
+                                    {{range $netIO := $host.NetworkStats}}
+                                        {{$netIO.Interface}}: {{formatRate $netIO.AvgUploadRate}}<br>
+                                    {{end}}
+                                </td> -->
                                 <td>{{$host.Timestamp.Format "2006-01-02 15:04:05"}}</td>
                             </tr>
                         {{end}}

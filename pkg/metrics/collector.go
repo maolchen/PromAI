@@ -100,8 +100,8 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 						Value:       float64(sample.Value),
 						Threshold:   metric.Threshold,
 						Unit:        metric.Unit,
-						Status:      getStatus(float64(sample.Value), metric.Threshold, metric.ThresholdType),
-						StatusText:  report.GetStatusText(getStatus(float64(sample.Value), metric.Threshold, metric.ThresholdType)),
+						Status:      getStatus(float64(sample.Value), metric.Threshold, metric.ThresholdType, metric.Type),
+						StatusText:  report.GetStatusText(getStatus(float64(sample.Value), metric.Threshold, metric.ThresholdType, metric.Type)),
 						Timestamp:   time.Now(),
 						Labels:      labels,
 					}
@@ -143,7 +143,13 @@ func validateMetricData(data report.MetricData, configLabels map[string]string) 
 }
 
 // getStatus 获取状态
-func getStatus(value, threshold float64, thresholdType string) string {
+func getStatus(value, threshold float64, thresholdType, metricType string) string {
+	// 展示类指标直接返回normal状态
+	if metricType == "display" {
+		return "normal"
+	}
+	
+	// 监控类指标进行阈值判断
 	if thresholdType == "" {
 		thresholdType = "greater"
 	}

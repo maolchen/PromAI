@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"math"
 	"os"
 	"sort"
 	"strings"
@@ -52,6 +51,21 @@ type DiskInfo struct {
 	DiskTotal  float64
 	DiskUsed   float64
 	DiskUsage  float64
+	Status     string // 新增：磁盘使用率状态
+}
+
+// 新增：磁盘IO信息结构
+type DiskIOInfo struct {
+	Device         string  // 磁盘设备名
+	AvgReadRate    float64 // 30分钟平均读取速率
+	AvgWriteRate   float64 // 30分钟平均写入速率
+}
+
+// 新增：网络IO信息结构
+type NetworkIOInfo struct {
+	Interface      string  // 网络接口名
+	AvgDownloadRate float64 // 30分钟平均下载速率
+	AvgUploadRate   float64 // 30分钟平均上传速率
 }
 
 type HostSummary struct {
@@ -59,11 +73,21 @@ type HostSummary struct {
 	IP        string
 	CPUCount  int64
 	CPUUsage  float64
+	CPUStatus string  // 新增：CPU使用率状态
 	MemTotal  float64
 	MemUsed   float64
 	MemUsage  float64
+	MemStatus string  // 新增：内存使用率状态
 	DiskData  []DiskInfo
 	Timestamp time.Time
+	
+	// 新增字段
+	Uptime          float64            // 运行时间(秒)
+	Load5           float64            // 5分钟负载
+	DiskIOStats     []DiskIOInfo       // 磁盘IO统计
+	TCPConnections  int64              // TCP连接数
+	TCPTimeWait     int64              // TCP TIME_WAIT连接数
+	NetworkStats    []NetworkIOInfo    // 网络IO统计
 }
 
 type ReportData struct {
@@ -106,6 +130,73 @@ func formatBytes(bytes float64) string {
 	return fmt.Sprintf("%.2f %s", floatBytes, unitPrefixes[unitIndex])
 }
 
+// 新增：运行时间格式化函数
+func formatUptime(seconds float64) string {
+	if seconds <= 0 {
+		return "0秒"
+	}
+
+	days := int(seconds) / 86400
+	hours := (int(seconds) % 86400) / 3600
+	minutes := (int(seconds) % 3600) / 60
+	secs := int(seconds) % 60
+
+	if days > 0 {
+		if hours > 0 {
+			return fmt.Sprintf("%d天%d小时%d分钟", days, hours, minutes)
+		}
+		return fmt.Sprintf("%d天%d分钟", days, minutes)
+	} else if hours > 0 {
+		return fmt.Sprintf("%d小时%d分钟", hours, minutes)
+	} else if minutes > 0 {
+		return fmt.Sprintf("%d分钟%d秒", minutes, secs)
+	}
+	return fmt.Sprintf("%d秒", secs)
+}
+
+// 新增：速率格式化函数（用于网络和磁盘IO）
+func formatRate(bytesPerSecond float64) string {
+	if bytesPerSecond == 0 {
+		return "0 B/s"
+	}
+
+	unitPrefixes := []string{"B/s", "KB/s", "MB/s", "GB/s", "TB/s"}
+	const unitSize = 1024
+
+	unitIndex := 0
+	floatRate := float64(bytesPerSecond)
+
+	for floatRate >= unitSize && unitIndex < len(unitPrefixes)-1 {
+		floatRate /= unitSize
+		unitIndex++
+	}
+
+	return fmt.Sprintf("%.2f %s", floatRate, unitPrefixes[unitIndex])
+}
+
+// 新增：数值格式化函数（用于连接数等）
+func formatNumber(number int64) string {
+	if number == 0 {
+		return "0"
+	}
+	
+	// 添加千位分隔符
+	str := fmt.Sprintf("%d", number)
+	if len(str) <= 3 {
+		return str
+	}
+	
+	var result []rune
+	for i, r := range str {
+		if i > 0 && (len(str)-i)%3 == 0 {
+			result = append(result, ',')
+		}
+		result = append(result, r)
+	}
+	
+	return string(result)
+}
+
 // 新增：提取IP地址函数，从instance:9100 提取
 func extractIP(instance string) string {
 	if idx := strings.LastIndex(instance, ":"); idx != -1 {
@@ -121,36 +212,25 @@ func GenerateReport(data ReportData) (string, error) {
 	}
 	// 计算每个组的统计信息
 	for _, group := range data.MetricGroups {
-		stats := GroupStats{
-			MinValue: math.MaxFloat64,
-		}
+		stats := GroupStats{}
 
 		for _, metrics := range group.MetricsByName {
 			for _, metric := range metrics {
-				// 更新最大最小值
-				stats.MaxValue = math.Max(stats.MaxValue, metric.Value)
-				stats.MinValue = math.Min(stats.MinValue, metric.Value)
+				log.Printf("Metric: %s, Status: %s, Value: %f, Threshold: %f, Unit: %s", metric.Name, metric.Status, metric.Value, metric.Threshold, metric.Unit)
 				stats.TotalCount++
 
-				// 累加值用于计算平均值
-				// stats.Average += metric.Value
-
-				// 统计告警数量
+				// 统计告警数量 - 优化后逻辑：严重和警告不重复计算
 				switch metric.Status {
 				case "warning":
 					stats.WarningCount++
-					stats.AlertCount++
 				case "critical":
 					stats.CriticalCount++
-					stats.AlertCount++
 				}
 			}
 		}
 
-		// 计算平均值 平均值无意义，先暂时取消
-		// if stats.TotalCount > 0 {
-		// 	stats.Average = stats.Average / float64(stats.TotalCount)
-		// }
+		// 告警总数 = 严重告警数 + 警告告警数
+		stats.AlertCount = stats.CriticalCount + stats.WarningCount
 		group.Stats = stats
 	}
 
@@ -243,10 +323,12 @@ func GenerateReport(data ReportData) (string, error) {
 
 				if _, exists := hostMap[instance]; !exists {
 					hostMap[instance] = &HostSummary{
-						Hostname:  instance,
-						IP:        extractIP(instance),
-						DiskData:  make([]DiskInfo, 0),
-						Timestamp: m.Timestamp,
+						Hostname:     instance,
+						IP:           extractIP(instance),
+						DiskData:     make([]DiskInfo, 0),
+						DiskIOStats:  make([]DiskIOInfo, 0),
+						NetworkStats: make([]NetworkIOInfo, 0),
+						Timestamp:    m.Timestamp,
 					}
 				}
 
@@ -257,11 +339,12 @@ func GenerateReport(data ReportData) (string, error) {
 					host.Timestamp = m.Timestamp
 				}
 
-				log.Printf("Processing metric: %s from instance %s, value: %f", metricName, instance, m.Value)
+				log.Printf("Processing metric: %s from instance %s, value: %f, status: %s", metricName, instance, m.Value, m.Status)
 				// 根据指标名填充数据
 				switch metricName {
 				case "CPU使用率":
 					host.CPUUsage = m.Value
+					host.CPUStatus = m.Status // 传递状态
 				case "CPU核心数":
 					host.CPUCount = int64(m.Value)
 				case "内存总量":
@@ -270,6 +353,81 @@ func GenerateReport(data ReportData) (string, error) {
 					host.MemUsed = m.Value
 					if host.MemTotal > 0 {
 						host.MemUsage = (host.MemUsed / host.MemTotal) * 100
+					}
+				case "内存使用率":
+					host.MemUsage = m.Value
+					host.MemStatus = m.Status // 传递状态
+				// 新增：处理运行时间指标
+				case "运行时间":
+					host.Uptime = m.Value
+				// 新增：处理5分钟负载指标
+				case "5分钟负载":
+					host.Load5 = m.Value
+				// 新增：处理TCP连接数指标
+				case "TCP连接数":
+					host.TCPConnections = int64(m.Value)
+				// 新增：处理TCP_TW数指标
+				case "TCP_TW数":
+					host.TCPTimeWait = int64(m.Value)
+				// 新增：处理磁盘IO指标
+				case "30分钟内磁盘平均读取值", "30分钟内磁盘平均写入值":
+					var device string
+					for _, label := range m.Labels {
+						if label.Name == "device" {
+							device = label.Value
+							break
+						}
+					}
+					if device == "" {
+						continue
+					}
+
+					var diskIO *DiskIOInfo
+					for i := range host.DiskIOStats {
+						if host.DiskIOStats[i].Device == device {
+							diskIO = &host.DiskIOStats[i]
+							break
+						}
+					}
+					if diskIO == nil {
+						host.DiskIOStats = append(host.DiskIOStats, DiskIOInfo{Device: device})
+						diskIO = &host.DiskIOStats[len(host.DiskIOStats)-1]
+					}
+
+					if metricName == "30分钟内磁盘平均读取值" {
+						diskIO.AvgReadRate = m.Value
+					} else if metricName == "30分钟内磁盘平均写入值" {
+						diskIO.AvgWriteRate = m.Value
+					}
+				// 新增：处理网络IO指标
+				case "30分钟内下载速率", "30分钟内上传速率":
+					var networkDevice string
+					for _, label := range m.Labels {
+						if label.Name == "device" {
+							networkDevice = label.Value
+							break
+						}
+					}
+					if networkDevice == "" {
+						continue
+					}
+
+					var networkIO *NetworkIOInfo
+					for i := range host.NetworkStats {
+						if host.NetworkStats[i].Interface == networkDevice {
+							networkIO = &host.NetworkStats[i]
+							break
+						}
+					}
+					if networkIO == nil {
+						host.NetworkStats = append(host.NetworkStats, NetworkIOInfo{Interface: networkDevice})
+						networkIO = &host.NetworkStats[len(host.NetworkStats)-1]
+					}
+
+					if metricName == "30分钟内下载速率" {
+						networkIO.AvgDownloadRate = m.Value
+					} else if metricName == "30分钟内上传速率" {
+						networkIO.AvgUploadRate = m.Value
 					}
 				case "磁盘总量", "磁盘可用量":
 					var mountPoint string
@@ -303,6 +461,34 @@ func GenerateReport(data ReportData) (string, error) {
 							disk.DiskUsage = (disk.DiskUsed / disk.DiskTotal) * 100
 						}
 					}
+				case "磁盘使用率":
+					// 处理磁盘使用率指标
+					var mountPoint string
+					for _, label := range m.Labels {
+						if label.Name == "mountpoint" {
+							mountPoint = label.Value
+							break
+						}
+					}
+					if mountPoint == "" {
+						continue
+					}
+
+					var disk *DiskInfo
+					for i := range host.DiskData {
+						if host.DiskData[i].MountPoint == mountPoint {
+							disk = &host.DiskData[i]
+							break
+						}
+					}
+					if disk == nil {
+						host.DiskData = append(host.DiskData, DiskInfo{MountPoint: mountPoint})
+						disk = &host.DiskData[len(host.DiskData)-1]
+					}
+
+					// 传递磁盘使用率和状态
+					disk.DiskUsage = m.Value
+					disk.Status = m.Status // 传递状态
 				}
 			}
 		}
@@ -316,7 +502,10 @@ func GenerateReport(data ReportData) (string, error) {
 
 	// // ✅ 注册模板函数
 	funcMap := template.FuncMap{
-		"formatBytes": formatBytes,
+		"formatBytes":  formatBytes,
+		"formatUptime": formatUptime,
+		"formatRate":   formatRate,
+		"formatNumber": formatNumber,
 	}
 
 	tmpl, err := template.New("report.html").Funcs(funcMap).ParseFiles("templates/report.html")

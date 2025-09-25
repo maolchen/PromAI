@@ -3,5 +3,6 @@
         
         "go": "D:\\Program Files\\go\\bin\\go.exe"
     },
-    "go.goroot": "D:\\Program Files\\go"
+    "go.goroot": "D:\\Program Files\\go",
+    "go.toolsEnvVars": {}
 }
