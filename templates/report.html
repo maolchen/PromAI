@@ -211,7 +211,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            background-color: rgb(196, 219, 209);
+            /* background-color: rgb(196, 219, 209); */
             margin: 10px 0;
             font-size: 14px;
         }
@@ -221,7 +221,7 @@
             text-align: center;
         }
         th {
-            background-color: #0a5fce;
+            background-color: #0ee656;
             position: sticky;
             color: white;
             top: 0;
@@ -246,8 +246,14 @@
             height: 400px;
             margin: 20px 0;
         }
-        .critical { color: #e60e24; }
-        .warning { color: #f3db07; }
+        .critical { 
+            background-color:rgb(238, 157, 157);
+            color: #e60e24; 
+        }
+        .warning { 
+            background-color:rgb(222, 231, 97);
+            color: #f3a807; 
+        }
         /* 响应式支持 */
         @media screen and (max-width: 1200px) {
             .container {
