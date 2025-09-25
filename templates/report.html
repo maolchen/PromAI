@@ -412,17 +412,6 @@
   {{range $metricName := $group.MetricOrder}} <!-- ✅ 按配置顺序遍历指标 -->
     {{$metrics := index $group.MetricsByName $metricName}} <!-- 从 map 中取出指标数据 -->
 
-    {{ if eq $metricName "CPU核心数" }}
-      
-    {{ else if eq $metricName "内存总量" }}
-
-    {{ else if eq $metricName "磁盘可用量" }}
-
-    {{ else if eq $metricName "内存使用量" }}
-
-    {{ else if eq $metricName "磁盘总量" }}
-
-    {{ else}}
     <h3><li>{{$metricName}}</li></h3>
 
     {{if eq (len $metrics) 0 }}
@@ -470,7 +459,6 @@
       </table>
     {{end}}
 
-    {{ end }}
 
   {{end}}
 </div>

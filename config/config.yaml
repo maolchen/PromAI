@@ -42,6 +42,7 @@ metric_types:
   metrics:
   - name: "CPU使用率"
     type: "monitoring"
+    show_in_table: false
     description: "节点CPU使用率统计"
     query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
     threshold: 80
@@ -52,6 +53,7 @@ metric_types:
 
   - name: "CPU核心数"
     type: "display"
+    show_in_table: false
     query: "count by (instance) (node_cpu_seconds_total{mode='idle'})"
     description: "节点CPU核心数统计"
     unit: "core"
@@ -60,6 +62,7 @@ metric_types:
 
   - name: "内存总量"
     type: "display"
+    show_in_table: false
     query: "node_memory_MemTotal_bytes"
     description: "节点内存总量统计"
     unit: "B"
@@ -68,6 +71,7 @@ metric_types:
 
   - name: "内存使用量"
     type: "display"
+    show_in_table: false
     query: "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes"
     description: "节点内存使用量统计"
     unit: "B"
@@ -76,6 +80,7 @@ metric_types:
 
   - name: "内存使用率"
     type: "monitoring"
+    show_in_table: false
     description: "节点内存使用率统计"
     query: "100 - ((node_memory_MemAvailable_bytes * 100) / node_memory_MemTotal_bytes)"
     threshold: 85
@@ -86,6 +91,7 @@ metric_types:
 
   - name: "磁盘总量"
     type: "display"
+    show_in_table: false
     query: >-
       node_filesystem_size_bytes{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"} * on(instance) group_left(nodename) node_uname_info
     description: "节点磁盘总量统计"
@@ -98,6 +104,7 @@ metric_types:
 
   - name: "磁盘可用量"
     type: "display"
+    show_in_table: false
     query: >-
       node_filesystem_avail_bytes{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"} * on(instance) group_left(nodename) node_uname_info
     description: "节点磁盘可用量统计"
@@ -110,6 +117,7 @@ metric_types:
 
   - name: "磁盘使用率"
     type: "monitoring"
+    show_in_table: false
     description: "节点磁盘使用率统计"
     query: >-
       (((100 -((node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes)) and ON (instance, device, mountpoint) node_filesystem_readonly{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"}== 0) + on(instance) group_left(node_uname_info) node_uname_info) * on(instance) group_left(nodename) node_uname_info
@@ -125,6 +133,7 @@ metric_types:
   # 新增展示类指标
   - name: "运行时间"
     type: "display"
+    show_in_table: false
     description: "系统运行时长统计"
     query: "time() - node_boot_time_seconds"
     unit: "s"
@@ -133,6 +142,7 @@ metric_types:
 
   - name: "5分钟负载"
     type: "display"
+    show_in_table: false
     description: "系统5分钟平均负载"
     query: "node_load5"
     unit: ""
@@ -141,6 +151,7 @@ metric_types:
 
   - name: "30分钟内磁盘平均读取值"
     type: "display"
+    show_in_table: false
     description: "30分钟内磁盘平均读取速率"
     query: 'avg_over_time(rate(node_disk_read_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m])'
     unit: "B/s"
@@ -150,6 +161,7 @@ metric_types:
 
   - name: "30分钟内磁盘平均写入值"
     type: "display"
+    show_in_table: true
     description: "30分钟内磁盘平均写入速率"
     query: 'avg_over_time(rate(node_disk_written_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m])'
     unit: "B/s"
@@ -159,6 +171,7 @@ metric_types:
 
   - name: "TCP连接数"
     type: "display"
+    show_in_table: false
     description: "当前活跃的TCP连接总数"
     query: "node_netstat_Tcp_CurrEstab"
     unit: "个"
@@ -167,6 +180,7 @@ metric_types:
 
   - name: "TCP_TW数"
     type: "display"
+    show_in_table: false
     description: "TCP TIME_WAIT状态连接数"
     query: "node_sockstat_TCP_tw"
     unit: "个"

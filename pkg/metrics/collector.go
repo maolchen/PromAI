@@ -113,8 +113,14 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 
 					metrics = append(metrics, metricData)
 				}
+				// 存储所有指标数据到MetricsByName（包括show_in_table=false的）
 				group.MetricsByName[metric.Name] = metrics
-				group.MetricOrder = append(group.MetricOrder, metric.Name)
+				
+				// 只有show_in_table为true或未设置的指标才添加到MetricOrder
+				// 默认行为：如果show_in_table为nil（未设置），则显示；如果显式设置为true，则显示
+				if metric.ShowInTable == nil || *metric.ShowInTable {
+					group.MetricOrder = append(group.MetricOrder, metric.Name)
+				}
 			}
 		}
 	}
