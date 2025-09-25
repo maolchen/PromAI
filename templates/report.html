@@ -287,6 +287,122 @@
                 white-space: nowrap;
             }
         }
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+    color: #333;
+}
+.summary-table th,
+.summary-table td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+/* 表头样式 */
+.summary-table thead th {
+    background-color: #f5f7fa;
+    font-weight: bold;
+    color: #2c3e50;
+    text-align: center;
+}
+
+/* 报告类目列（窄一些） */
+.category-header,
+.category-cell {
+    width: 180px; /* 控制类目列宽度 */
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+/* 报告内容列（自动扩展） */
+.content-header,
+.input-cell {
+    width: auto;
+}
+
+.editable-input {
+    outline: none;
+    border: 1px solid #ccc;
+    padding: 6px;
+    min-width: 200px;
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.editable-input.multi-line {
+    min-height: 60px;
+    resize: vertical;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* 鼠标悬停效果增强可编辑性 */
+.input-cell:hover .editable-input {
+    border-color: #007bff;
+}
+
+        /* 浏览器打印样式 */
+        @media print {
+            .summary-table {
+                page-break-inside: avoid;
+                font-size: 12px;
+                border-collapse: collapse;
+            }
+            
+            .summary-table th,
+            .summary-table td {
+                border: 1px solid #000 !important;
+                padding: 8px !important;
+            }
+            
+            .editable-input {
+                border: none !important;
+                background: white !important;
+                -webkit-print-color-adjust: exact;
+                color: #000 !important;
+                font-size: 11px !important;
+            }
+            
+            .editable-input img {
+                max-width: 150px !important;
+                max-height: 100px !important;
+                page-break-inside: avoid;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            .summary-section {
+                page-break-before: auto;
+                margin-top: 20px;
+            }
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .summary-table {
+                font-size: 12px;
+            }
+            
+            .summary-table th,
+            .summary-table td {
+                padding: 6px 4px;
+            }
+            
+            .input-cell {
+                height: 80px;
+            }
+            
+            .editable-input {
+                padding: 4px;
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -531,6 +647,53 @@
 {{end}}
     </div>
 
+<!-- 总结表格区域 -->
+<div class="summary-table">
+    <h2>巡检总结</h2>
+  
+    <!-- 总结表格 -->
+<table class="summary-table vertical-table">
+    <thead>
+        <tr>
+            <th class="category-header">报告类目</th>
+            <th class="content-header">报告内容</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="category-cell">巡检人</td>
+            <td class="input-cell">
+                <div contenteditable="true" class="editable-input single-line" data-cell="0"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="category-cell">巡检日期</td>
+            <td class="input-cell">
+                <div contenteditable="true" class="editable-input single-line" data-cell="1"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="category-cell">巡检问题</td>
+            <td class="input-cell">
+                <div contenteditable="true" class="editable-input multi-line" data-cell="2"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="category-cell">巡检建议</td>
+            <td class="input-cell">
+                <div contenteditable="true" class="editable-input multi-line" data-cell="3"></div>
+            </td>
+        </tr>
+        <tr>
+            <td class="category-cell">备注</td>
+            <td class="input-cell">
+                <div contenteditable="true" class="editable-input multi-line" data-cell="4"></div>
+            </td>
+        </tr>
+    </tbody>
+</table>
+</div>
+
 <script>
     // 生成随机颜色
     function getRandomColor() {
@@ -658,6 +821,112 @@
             }
         }
     });
+
+    // 总结表格功能初始化
+    setupImagePasteHandling();
+    loadContentFromStorage();
+    setupAutoSave();
+    
+    // 浏览器打印优化
+    window.addEventListener('beforeprint', optimizeForPrint);
+
+    // 图片粘贴处理
+    function setupImagePasteHandling() {
+        document.querySelectorAll('.editable-input').forEach(element => {
+            element.addEventListener('paste', function(e) {
+                const items = e.clipboardData.items;
+                
+                for (let item of items) {
+                    if (item.type.startsWith('image/')) {
+                        e.preventDefault();
+                        const file = item.getAsFile();
+                        const reader = new FileReader();
+                        
+                        reader.onload = function(event) {
+                            const img = document.createElement('img');
+                            img.src = event.target.result;
+                            img.style.maxWidth = '100%';
+                            
+                            insertImageAtCursor(element, img);
+                            saveContentToStorage();
+                        };
+                        
+                        reader.readAsDataURL(file);
+                        break;
+                    }
+                }
+            });
+        });
+    }
+
+    function insertImageAtCursor(container, img) {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            if (container.contains(range.commonAncestorContainer)) {
+                range.insertNode(img);
+                range.setStartAfter(img);
+                range.setEndAfter(img);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                container.appendChild(img);
+            }
+        } else {
+            container.appendChild(img);
+        }
+    }
+
+    // 本地存储管理
+    function saveContentToStorage() {
+        const data = {};
+        document.querySelectorAll('.editable-input').forEach((element, index) => {
+            data[`cell_${index}`] = element.innerHTML;
+        });
+        
+        localStorage.setItem('inspection_summary', JSON.stringify(data));
+    }
+
+    function loadContentFromStorage() {
+        const saved = localStorage.getItem('inspection_summary');
+        if (saved) {
+            const data = JSON.parse(saved);
+            document.querySelectorAll('.editable-input').forEach((element, index) => {
+                if (data[`cell_${index}`]) {
+                    element.innerHTML = data[`cell_${index}`];
+                }
+            });
+        }
+    }
+
+    function setupAutoSave() {
+        document.querySelectorAll('.editable-input').forEach(element => {
+            element.addEventListener('input', debounce(saveContentToStorage, 500));
+            element.addEventListener('blur', saveContentToStorage);
+        });
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // 浏览器打印优化函数
+    function optimizeForPrint() {
+        // 在打印前确保所有内容可见
+        document.querySelectorAll('.editable-input').forEach(element => {
+            if (element.innerHTML.trim() === '') {
+                element.innerHTML = '&nbsp;'; // 空单元格显示占位符
+            }
+        });
+    }
 
 </script>
 </body>
