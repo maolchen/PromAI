@@ -56,14 +56,14 @@ type DiskInfo struct {
 
 // 新增：磁盘IO信息结构
 type DiskIOInfo struct {
-	Device         string  // 磁盘设备名
-	AvgReadRate    float64 // 30分钟平均读取速率
-	AvgWriteRate   float64 // 30分钟平均写入速率
+	Device       string  // 磁盘设备名
+	AvgReadRate  float64 // 30分钟平均读取速率
+	AvgWriteRate float64 // 30分钟平均写入速率
 }
 
 // 新增：网络IO信息结构
 type NetworkIOInfo struct {
-	Interface      string  // 网络接口名
+	Interface       string  // 网络接口名
 	AvgDownloadRate float64 // 30分钟平均下载速率
 	AvgUploadRate   float64 // 30分钟平均上传速率
 }
@@ -73,21 +73,21 @@ type HostSummary struct {
 	IP        string
 	CPUCount  int64
 	CPUUsage  float64
-	CPUStatus string  // 新增：CPU使用率状态
+	CPUStatus string // 新增：CPU使用率状态
 	MemTotal  float64
 	MemUsed   float64
 	MemUsage  float64
-	MemStatus string  // 新增：内存使用率状态
+	MemStatus string // 新增：内存使用率状态
 	DiskData  []DiskInfo
 	Timestamp time.Time
-	
+
 	// 新增字段
-	Uptime          float64            // 运行时间(秒)
-	Load5           float64            // 5分钟负载
-	DiskIOStats     []DiskIOInfo       // 磁盘IO统计
-	TCPConnections  int64              // TCP连接数
-	TCPTimeWait     int64              // TCP TIME_WAIT连接数
-	NetworkStats    []NetworkIOInfo    // 网络IO统计
+	Uptime         float64         // 运行时间(秒)
+	Load5          float64         // 5分钟负载
+	DiskIOStats    []DiskIOInfo    // 磁盘IO统计
+	TCPConnections int64           // TCP连接数
+	TCPTimeWait    int64           // TCP TIME_WAIT连接数
+	NetworkStats   []NetworkIOInfo // 网络IO统计
 }
 
 type ReportData struct {
@@ -173,13 +173,13 @@ func formatNumber(number int64) string {
 	if number == 0 {
 		return "0"
 	}
-	
+
 	// 添加千位分隔符
 	str := fmt.Sprintf("%d", number)
 	if len(str) <= 3 {
 		return str
 	}
-	
+
 	var result []rune
 	for i, r := range str {
 		if i > 0 && (len(str)-i)%3 == 0 {
@@ -187,47 +187,8 @@ func formatNumber(number int64) string {
 		}
 		result = append(result, r)
 	}
-	
-	return string(result)
-}
 
-// 新增：磁盘数据一致性验证函数
-func validateDiskConsistency(host *HostSummary) {
-	for i := range host.DiskData {
-		disk := &host.DiskData[i]
-		
-		// 验证磁盘使用量计算的一致性
-		if disk.DiskTotal > 0 && disk.DiskUsed >= 0 {
-			calculatedUsage := (disk.DiskUsed / disk.DiskTotal) * 100
-			
-			// 如果计算值与实际值差异过大，记录警告并修正
-			if disk.DiskUsage > 0 && (calculatedUsage - disk.DiskUsage > 5 || disk.DiskUsage - calculatedUsage > 5) {
-				log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用率数据不一致，计算值: %.2f%%, 实际值: %.2f%%", 
-					host.Hostname, disk.MountPoint, calculatedUsage, disk.DiskUsage)
-				// 使用计算值作为修正值
-				disk.DiskUsage = calculatedUsage
-			}
-		}
-		
-		// 验证磁盘使用量不能为负数
-		if disk.DiskUsed < 0 {
-			log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用量为负数: %.2f，已修正为0", 
-				host.Hostname, disk.MountPoint, disk.DiskUsed)
-			disk.DiskUsed = 0
-			disk.DiskUsage = 0
-		}
-		
-		// 验证磁盘使用率范围
-		if disk.DiskUsage < 0 {
-			log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用率为负数: %.2f%%，已修正为0%%", 
-				host.Hostname, disk.MountPoint, disk.DiskUsage)
-			disk.DiskUsage = 0
-		} else if disk.DiskUsage > 100 {
-			log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用率超过100%%: %.2f%%，已修正为100%%", 
-				host.Hostname, disk.MountPoint, disk.DiskUsage)
-			disk.DiskUsage = 100
-		}
-	}
+	return string(result)
 }
 
 // 新增：提取IP地址函数，从instance:9100 提取
@@ -240,8 +201,9 @@ func extractIP(instance string) string {
 
 func GenerateReport(data ReportData) (string, error) {
 	log.Printf("GroupOrder: %+v", data.GroupOrder)
+	// debug日志： 确认api 接口获取的数据是正常的
 	for groupType, group := range data.MetricGroups {
-		log.Printf("Group [%s] MetricOrder: %+v", groupType, group.MetricOrder) // ✅ 这里应该不报错且有值
+		log.Printf("Group [%s] MetricOrder: %+v", groupType, group.MetricOrder)
 	}
 	// 计算每个组的统计信息
 	for _, group := range data.MetricGroups {
@@ -372,7 +334,8 @@ func GenerateReport(data ReportData) (string, error) {
 					host.Timestamp = m.Timestamp
 				}
 
-				log.Printf("Processing metric: %s from instance %s, value: %f, status: %s", metricName, instance, m.Value, m.Status)
+				//debug 日志： 确认MetricsData里的数据是正常的
+				// log.Printf("Processing metric: %s from instance %s, value: %f, status: %s", metricName, instance, m.Value, m.Status)
 				// 根据指标名填充数据
 				switch metricName {
 				case "CPU使用率":
@@ -462,7 +425,7 @@ func GenerateReport(data ReportData) (string, error) {
 					} else if metricName == "30分钟内上传速率" {
 						networkIO.AvgUploadRate = m.Value
 					}
-				case "磁盘总量", "磁盘可用量":
+				case "磁盘总量", "磁盘使用量", "磁盘使用率":
 					var mountPoint string
 					for _, label := range m.Labels {
 						if label.Name == "mountpoint" {
@@ -488,40 +451,12 @@ func GenerateReport(data ReportData) (string, error) {
 
 					if metricName == "磁盘总量" {
 						disk.DiskTotal = m.Value
-					} else if metricName == "磁盘可用量" {
-						disk.DiskUsed = disk.DiskTotal - m.Value
-						if disk.DiskTotal > 0 {
-							disk.DiskUsage = (disk.DiskUsed / disk.DiskTotal) * 100
-						}
+					} else if metricName == "磁盘使用量" {
+						disk.DiskUsed = m.Value
+					} else if metricName == "磁盘使用率" {
+						disk.DiskUsage = m.Value
+						disk.Status = m.Status
 					}
-				case "磁盘使用率":
-					// 处理磁盘使用率指标
-					var mountPoint string
-					for _, label := range m.Labels {
-						if label.Name == "mountpoint" {
-							mountPoint = label.Value
-							break
-						}
-					}
-					if mountPoint == "" {
-						continue
-					}
-
-					var disk *DiskInfo
-					for i := range host.DiskData {
-						if host.DiskData[i].MountPoint == mountPoint {
-							disk = &host.DiskData[i]
-							break
-						}
-					}
-					if disk == nil {
-						host.DiskData = append(host.DiskData, DiskInfo{MountPoint: mountPoint})
-						disk = &host.DiskData[len(host.DiskData)-1]
-					}
-
-					// 传递磁盘使用率和状态
-					disk.DiskUsage = m.Value
-					disk.Status = m.Status // 传递状态
 				}
 			}
 		}
@@ -530,8 +465,6 @@ func GenerateReport(data ReportData) (string, error) {
 	// 转换为切片
 	data.HostSummary = make([]HostSummary, 0, len(hostMap))
 	for _, h := range hostMap {
-		// 在添加到结果集前验证磁盘数据一致性
-		validateDiskConsistency(h)
 		data.HostSummary = append(data.HostSummary, *h)
 	}
 
@@ -568,10 +501,11 @@ func GenerateReport(data ReportData) (string, error) {
 	}
 
 	// log.Println("Report generated successfully:", filename)
-	for _, h := range data.HostSummary {
-		log.Printf("Host: %s, CPUCount: %d, MemTotal: %f, MemUsed: %f, DiskData: %d",
-			h.Hostname, h.CPUCount, h.MemTotal, h.MemUsed, len(h.DiskData))
-	}
+	// debug 日志： 确认最后生成的数据是正常的
+	// for _, h := range data.HostSummary {
+	// 	log.Printf("Host: %s, CPUCount: %d, MemTotal: %f, MemUsed: %f, DiskData: %d",
+	// 		h.Hostname, h.CPUCount, h.MemTotal, h.MemUsed, len(h.DiskData))
+	// }
 	log.Printf("项目[%s]报告生成成功: %s", data.Project, filename)
 
 	return filename, nil // 添加返回语句

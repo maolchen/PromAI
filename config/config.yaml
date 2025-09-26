@@ -1,4 +1,4 @@
-prometheus_url: "http://10.1.114.50:9090"
+prometheus_url: "http://10.1.114.50:8390"
 
 project_name: "测试项目巡检报告"
 
@@ -95,34 +95,32 @@ metric_types:
     type: "display"
     show_in_table: false
     query: >-
-      node_filesystem_size_bytes{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"} * on(instance) group_left(nodename) node_uname_info
+      node_filesystem_size_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}-0
     description: "节点磁盘总量统计"
     unit: "B"
     labels:
       instance: "节点"
       mountpoint: "挂载点"
       device: "磁盘"
-      nodename: "节点名称"
 
-  - name: "磁盘可用量"
+  - name: "磁盘使用量"
     type: "display"
     show_in_table: false
     query: >-
-      node_filesystem_avail_bytes{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"} * on(instance) group_left(nodename) node_uname_info
-    description: "节点磁盘可用量统计"
+      node_filesystem_size_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"} - node_filesystem_avail_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}
+    description: "节点磁盘使用量统计"
     unit: "B"
     labels:
       instance: "节点"
       mountpoint: "挂载点"
       device: "磁盘"
-      nodename: "节点名称"
 
   - name: "磁盘使用率"
     type: "monitoring"
     show_in_table: false
     description: "节点磁盘使用率统计"
     query: >-
-      (((100 -((node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes)) and ON (instance, device, mountpoint) node_filesystem_readonly{mountpoint!~"/run.*|/var.*|/boot.*|/tmp.*"}== 0) + on(instance) group_left(node_uname_info) node_uname_info) * on(instance) group_left(nodename) node_uname_info
+      (node_filesystem_size_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}-node_filesystem_free_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}) *100/(node_filesystem_avail_bytes {fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}+(node_filesystem_size_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}-node_filesystem_free_bytes{fstype=~"ext.*|xfs",mountpoint !~".*pod.*|/run.*|/boot.*|/tmp.*"}))
     threshold: 80
     threshold_type: "greater"
     unit: "%"
@@ -130,7 +128,6 @@ metric_types:
       instance: "节点"
       mountpoint: "挂载点"
       device: "磁盘"
-      nodename: "节点名称"
 
   # 新增展示类指标 - 注意：速率指标已在PromQL中进行单位换算，直接输出MB/s
   - name: "运行时间"
