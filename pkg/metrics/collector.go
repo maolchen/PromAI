@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"strings"
 	"time"
 
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -45,6 +46,12 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 		Project:      c.config.ProjectName,
 	}
 
+	// 添加数据质量统计
+	totalMetrics := 0
+	validMetrics := 0
+	invalidMetrics := 0
+	diskAnomalies := 0
+
 	for _, metricType := range c.config.MetricTypes {
 		group := &report.MetricGroup{
 			Type:          metricType.Type,
@@ -57,7 +64,7 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 		for _, metric := range metricType.Metrics {
 			result, _, err := c.Client.Query(ctx, metric.Query, time.Now())
 			if err != nil {
-				log.Printf("警告: 查询指标 %s 失败: %v", metric.Name, err)
+				log.Printf("警告: 查询指标 %s 失败: %v, PromQL: %s", metric.Name, err, metric.Query)
 				continue
 			}
 			log.Printf("指标 [%s] 查询结果: %+v", metric.Name, result)
@@ -66,7 +73,19 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 			case model.Vector:
 				metrics := make([]report.MetricData, 0, len(v))
 				for _, sample := range v {
+					totalMetrics++
 					log.Printf("指标 [%s] 原始数据: %+v, 值: %+v", metric.Name, sample.Metric, sample.Value)
+
+					// 数据验证：在处理数据前先验证数值的合理性
+					if err := validateMetricValue(metric.Name, float64(sample.Value)); err != nil {
+						invalidMetrics++
+						if strings.Contains(metric.Name, "磁盘") {
+							diskAnomalies++
+						}
+						log.Printf("警告: 指标 [%s] 数据验证失败: %v, 原始值: %f", metric.Name, err, float64(sample.Value))
+						continue // 跳过异常数据
+					}
+					validMetrics++
 
 					availableLabels := make(map[string]string)
 					for labelName, labelValue := range sample.Metric {
@@ -124,6 +143,10 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 			}
 		}
 	}
+	
+	// 输出数据质量统计报告
+	log.Printf("数据收集统计 - 总指标数: %d, 有效数: %d, 无效数: %d, 磁盘异常: %d", 
+		totalMetrics, validMetrics, invalidMetrics, diskAnomalies)
 	return data, nil
 }
 
@@ -203,4 +226,46 @@ func validateLabels(labels []report.LabelData) bool {
 		}
 	}
 	return true
+}
+
+// validateDiskData 验证磁盘相关数据的合理性
+func validateDiskData(metricName string, value float64, labels []report.LabelData) error {
+	// 根据指标类型进行不同的验证
+	switch metricName {
+	case "磁盘总量":
+		// 磁盘总量必须大于0
+		if value <= 0 {
+			return fmt.Errorf("磁盘总量不能为负数或零: %.2f", value)
+		}
+		// 合理性检查：磁盘总量不应该超过1PB (太大可能是数据异常)
+		if value > 1024*1024*1024*1024*1024 { // 1PB in bytes
+			return fmt.Errorf("磁盘总量异常过大: %.2f bytes", value)
+		}
+	
+	case "磁盘可用量":
+		// 磁盘可用量必须大于等于0
+		if value < 0 {
+			return fmt.Errorf("磁盘可用量不能为负数: %.2f", value)
+		}
+	
+	case "磁盘使用率":
+		// 磁盘使用率必须在0-100%范围内
+		if value < 0 || value > 100 {
+			return fmt.Errorf("磁盘使用率超出合理范围(0-100%%): %.2f%%", value)
+		}
+	}
+	
+	return nil
+}
+
+// validateMetricValue 验证指标数值的合理性
+func validateMetricValue(metricName string, value float64) error {
+	// TODO: 可以添加NaN和无穷大检查，需要导入math包
+	
+	// 磁盘相关指标的特殊验证
+	if err := validateDiskData(metricName, value, nil); err != nil {
+		return err
+	}
+	
+	return nil
 }

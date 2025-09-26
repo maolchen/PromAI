@@ -160,18 +160,12 @@ func formatRate(bytesPerSecond float64) string {
 		return "0 B/s"
 	}
 
-	unitPrefixes := []string{"B/s", "KB/s", "MB/s", "GB/s", "TB/s"}
-	const unitSize = 1024
-
-	unitIndex := 0
-	floatRate := float64(bytesPerSecond)
-
-	for floatRate >= unitSize && unitIndex < len(unitPrefixes)-1 {
-		floatRate /= unitSize
-		unitIndex++
+	// 对于已经在PromQL中换算过的MB/s单位数据，直接格式化显示
+	if bytesPerSecond < 1024 {
+		return fmt.Sprintf("%.2f MB/s", bytesPerSecond)
+	} else {
+		return fmt.Sprintf("%.2f GB/s", bytesPerSecond/1024)
 	}
-
-	return fmt.Sprintf("%.2f %s", floatRate, unitPrefixes[unitIndex])
 }
 
 // 新增：数值格式化函数（用于连接数等）
@@ -195,6 +189,45 @@ func formatNumber(number int64) string {
 	}
 	
 	return string(result)
+}
+
+// 新增：磁盘数据一致性验证函数
+func validateDiskConsistency(host *HostSummary) {
+	for i := range host.DiskData {
+		disk := &host.DiskData[i]
+		
+		// 验证磁盘使用量计算的一致性
+		if disk.DiskTotal > 0 && disk.DiskUsed >= 0 {
+			calculatedUsage := (disk.DiskUsed / disk.DiskTotal) * 100
+			
+			// 如果计算值与实际值差异过大，记录警告并修正
+			if disk.DiskUsage > 0 && (calculatedUsage - disk.DiskUsage > 5 || disk.DiskUsage - calculatedUsage > 5) {
+				log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用率数据不一致，计算值: %.2f%%, 实际值: %.2f%%", 
+					host.Hostname, disk.MountPoint, calculatedUsage, disk.DiskUsage)
+				// 使用计算值作为修正值
+				disk.DiskUsage = calculatedUsage
+			}
+		}
+		
+		// 验证磁盘使用量不能为负数
+		if disk.DiskUsed < 0 {
+			log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用量为负数: %.2f，已修正为0", 
+				host.Hostname, disk.MountPoint, disk.DiskUsed)
+			disk.DiskUsed = 0
+			disk.DiskUsage = 0
+		}
+		
+		// 验证磁盘使用率范围
+		if disk.DiskUsage < 0 {
+			log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用率为负数: %.2f%%，已修正为0%%", 
+				host.Hostname, disk.MountPoint, disk.DiskUsage)
+			disk.DiskUsage = 0
+		} else if disk.DiskUsage > 100 {
+			log.Printf("警告: 主机 [%s] 磁盘 [%s] 使用率超过100%%: %.2f%%，已修正为100%%", 
+				host.Hostname, disk.MountPoint, disk.DiskUsage)
+			disk.DiskUsage = 100
+		}
+	}
 }
 
 // 新增：提取IP地址函数，从instance:9100 提取
@@ -497,6 +530,8 @@ func GenerateReport(data ReportData) (string, error) {
 	// 转换为切片
 	data.HostSummary = make([]HostSummary, 0, len(hostMap))
 	for _, h := range hostMap {
+		// 在添加到结果集前验证磁盘数据一致性
+		validateDiskConsistency(h)
 		data.HostSummary = append(data.HostSummary, *h)
 	}
 

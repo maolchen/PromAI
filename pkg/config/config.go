@@ -35,4 +35,8 @@ type MetricConfig struct {
 	Unit          string            `yaml:"unit"`
 	Labels        map[string]string `yaml:"labels"`
 	ThresholdType string            `yaml:"threshold_type"`
+	// 新增单位换算配置
+	ScaleFactor   *float64          `yaml:"scale_factor,omitempty"`   // 缩放因子，用于附加的数值调整
+	TargetUnit    string            `yaml:"target_unit,omitempty"`    // 目标显示单位
+	FormatType    string            `yaml:"format_type,omitempty"`    // 格式化类型：rate, bytes, number, time
 }

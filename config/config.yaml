@@ -130,7 +130,7 @@ metric_types:
       device: "磁盘"
       nodename: "节点名称"
 
-  # 新增展示类指标
+  # 新增展示类指标 - 注意：速率指标已在PromQL中进行单位换算，直接输出MB/s
   - name: "运行时间"
     type: "display"
     show_in_table: false
@@ -153,8 +153,8 @@ metric_types:
     type: "display"
     show_in_table: false
     description: "30分钟内磁盘平均读取速率"
-    query: 'avg_over_time(rate(node_disk_read_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m])'
-    unit: "B/s"
+    query: 'avg_over_time(rate(node_disk_read_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m]) / 1024 / 1024'
+    unit: "MB/s"
     labels:
       instance: "节点"
       device: "设备"
@@ -163,8 +163,8 @@ metric_types:
     type: "display"
     show_in_table: true
     description: "30分钟内磁盘平均写入速率"
-    query: 'avg_over_time(rate(node_disk_written_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m])'
-    unit: "B/s"
+    query: 'avg_over_time(rate(node_disk_written_bytes_total{device=~"vd.*|sd.*"}[5m])[30m:1m]) / 1024 / 1024'
+    unit: "MB/s"
     labels:
       instance: "节点"
       device: "设备"
@@ -190,8 +190,8 @@ metric_types:
   - name: "30分钟内下载速率"
     type: "display"
     description: "30分钟内网络平均下载速率"
-    query: 'avg_over_time(rate(node_network_receive_bytes_total{device=~"eth.*|ens.*"}[5m])[30m:1m])'
-    unit: "B/s"
+    query: 'avg_over_time(rate(node_network_receive_bytes_total{device=~"eth.*|ens.*"}[5m])[30m:1m]) / 1024 / 1024'
+    unit: "MB/s"
     labels:
       instance: "节点"
       device: "设备"
@@ -199,8 +199,8 @@ metric_types:
   - name: "30分钟内上传速率"
     type: "display"
     description: "30分钟内网络平均上传速率"
-    query: 'avg_over_time(rate(node_network_transmit_bytes_total{device=~"eth.*|ens.*"}[5m])[30m:1m])'
-    unit: "B/s"
+    query: 'avg_over_time(rate(node_network_transmit_bytes_total{device=~"eth.*|ens.*"}[5m])[30m:1m]) / 1024 / 1024'
+    unit: "MB/s"
     labels:
       instance: "节点"
       device: "设备"
