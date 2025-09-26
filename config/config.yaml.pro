@@ -316,7 +316,7 @@ metric_types:
     description: "域名证书有效期检查"
     query: "round((probe_ssl_earliest_cert_expiry - time()) / 86400)"
     threshold: 60
-    threshold_type: "greater"
+    threshold_type: "at_least"
     unit: "天"
     labels:
       instance: "节点"
