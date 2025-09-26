@@ -134,7 +134,7 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 				}
 				// 存储所有指标数据到MetricsByName（包括show_in_table=false的）
 				group.MetricsByName[metric.Name] = metrics
-				
+
 				// 只有show_in_table为true或未设置的指标才添加到MetricOrder
 				// 默认行为：如果show_in_table为nil（未设置），则显示；如果显式设置为true，则显示
 				if metric.ShowInTable == nil || *metric.ShowInTable {
@@ -143,9 +143,9 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 			}
 		}
 	}
-	
+
 	// 输出数据质量统计报告
-	log.Printf("数据收集统计 - 总指标数: %d, 有效数: %d, 无效数: %d, 磁盘异常: %d", 
+	log.Printf("数据收集统计 - 总指标数: %d, 有效数: %d, 无效数: %d, 磁盘异常: %d",
 		totalMetrics, validMetrics, invalidMetrics, diskAnomalies)
 	return data, nil
 }
@@ -177,7 +177,7 @@ func getStatus(value, threshold float64, thresholdType, metricType string) strin
 	if metricType == "display" {
 		return "normal"
 	}
-	
+
 	// 监控类指标进行阈值判断
 	if thresholdType == "" {
 		thresholdType = "greater"
@@ -214,7 +214,16 @@ func getStatus(value, threshold float64, thresholdType, metricType string) strin
 			return "critical"
 		}
 		return "critical"
+	// 新增下限保障型操作符
+	case "at_least":
+		if value >= threshold {
+			return "normal"
+		} else if value >= threshold*0.8 {
+			return "warning"
+		}
+		return "critical"
 	}
+
 	return "normal"
 }
 
@@ -241,31 +250,31 @@ func validateDiskData(metricName string, value float64, labels []report.LabelDat
 		if value > 1024*1024*1024*1024*1024 { // 1PB in bytes
 			return fmt.Errorf("磁盘总量异常过大: %.2f bytes", value)
 		}
-	
+
 	case "磁盘可用量":
 		// 磁盘可用量必须大于等于0
 		if value < 0 {
 			return fmt.Errorf("磁盘可用量不能为负数: %.2f", value)
 		}
-	
+
 	case "磁盘使用率":
 		// 磁盘使用率必须在0-100%范围内
 		if value < 0 || value > 100 {
 			return fmt.Errorf("磁盘使用率超出合理范围(0-100%%): %.2f%%", value)
 		}
 	}
-	
+
 	return nil
 }
 
 // validateMetricValue 验证指标数值的合理性
 func validateMetricValue(metricName string, value float64) error {
 	// TODO: 可以添加NaN和无穷大检查，需要导入math包
-	
+
 	// 磁盘相关指标的特殊验证
 	if err := validateDiskData(metricName, value, nil); err != nil {
 		return err
 	}
-	
+
 	return nil
 }

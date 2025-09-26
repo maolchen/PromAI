@@ -85,7 +85,7 @@ metric_types:
 - `threshold`: 指标阈值
 - `unit`: 指标单位
 - `labels`: 标签别名
-- `threshold_type`: 阈值比较方式: "greater", "less", "equal", "greater_equal", "less_equal"
+- `threshold_type`: 阈值比较方式: "greater", "less", "equal", "greater_equal", "less_equal"，"at_least"
 
 ```txt
 greater: 表示值必须大于阈值才被视为 "critical" 状态。
@@ -93,6 +93,7 @@ greater_equal: 表示值必须大于或等于阈值才被视为 "critical" 状�
 less: 表示值必须小于阈值才被视为 "normal" 状态。
 less_equal: 表示值必须小于或等于阈值才被视为 "normal" 状态。
 equal: 表示值必须等于阈值才被视为 "normal" 状态。
+at_least: 检测值必须大于等于阈值才被视为 "normal" 状态。
 ```
 
 ## 快速开始
@@ -157,6 +158,7 @@ go build -o PromAI main.go
 - 增加了主机资源综合概览表  
 - 页面风格调整  
 - 增加了巡检总结表格，可人工填写，可贴图（贴图不会上传到后端，我个人贴图是为了能打印为pdf，报告主要是输出pdf文档）  
+- 新增一个阈值判断操作符at_least  
 
 # 后续可能会做的  
 - 增加AI报告分析  
