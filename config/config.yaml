@@ -1,4 +1,4 @@
-prometheus_url: "http://10.1.114.50:8390"
+prometheus_url: "http://10.1.114.50:9090"
 
 project_name: "测试项目巡检报告"
 
@@ -13,14 +13,15 @@ report_cleanup:
   max_age: 7 # 保留最近7天的报告
   cron_schedule: "0 0 * * *" # 如果为空，则执行执行上面定时任务，即生成报告时清理
 
-# 配置发送钉钉和邮件
+# 配置发送钉钉和邮件和企业微信通知
 
 notifications:
+  # 企微
   wecom:
     enabled: true
-    webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1df4d960-b7a7-43d6-9793-59f9e460c1d8"
+    webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxxxxxxxxxxxxxx" # 企微机器人webhook
     report_url: "http://10.1.114.66:8091"
-    project_title: "测试项目"
+    project_title: "测试项目" #企微通知标题，用于多项目时区分项目
   dingtalk:
     enabled: false
     webhook: "https://oapi.dingtalk.com/robot/send?access_token=xxxxxxxxxxxxxxxxxxxxxxxxxxxx" # 这里填写自己的webhook
@@ -40,9 +41,10 @@ notifications:
 metric_types:
 - type: "基础资源使用情况"
   metrics:
+  # 基础资源中的metrics 的name不能修改，不然会导致判断不到，无法渲染到主机资源概览表中（只要是希望渲染到主机资源概览表中的，就不能修改）
   - name: "CPU使用率"
-    type: "monitoring"
-    show_in_table: false
+    type: "monitoring" #type 有三种：monitoring: 报告中会要警告颜色区分 display：仅做数据展示，不区分颜色
+    show_in_table: false # 是否在资源类型详情表中展示，false 表示不展示,true 表示展示。一般在主机资源概览表中展示的就没必要再到资源类型详情的监控中展示了，如果全都在主机资源概览表中展示，表会很丑陋，所以增加了该参数来控制展示区域
     description: "节点CPU使用率统计"
     query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
     threshold: 80

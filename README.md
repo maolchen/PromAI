@@ -5,6 +5,8 @@
 ## 项目简介
 
 这是一个基于 Prometheus 的监控报告自动生成工具，可以自动收集、分析指标数据并生成可视化的 HTML 报告。该工具旨在简化监控数据的收集和展示过程，帮助运维人员快速了解系统状态。
+项目基于 https://github.com/kubehan/PromAI 二次开发。  
+
 
 ## 报告样式
 ### 获取报告
@@ -14,6 +16,7 @@ http://localhost:8091/getreport
 ![report](images/资源概览.png)
 <!-- ![report](images/image.png) -->
 ![report](images/image2.png)
+![report](images/image3.png)  
 
 ## 服务健康看板
 ### 获取服务健康看板
@@ -53,16 +56,19 @@ http://localhost:8091/status
 prometheus_url: "http://prometheus.k8s.kubehan.cn"
 
 metric_types:
-  - type: "基础资源使用情况"
-    metrics:
-      - name: "CPU使用率"
-        description: "节点CPU使用率统计"
-        query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
-        trend_query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)[6h:5m]"
-        threshold: 80
-        unit: "%"
-        labels:
-          instance: "节点"
+- type: "基础资源使用情况"
+  metrics:
+  # 基础资源中的metrics 的name不能修改，不然会导致判断不到，无法渲染到主机资源概览表中（只要是希望渲染到主机资源概览表中的，就不能修改）
+  - name: "CPU使用率"
+    type: "monitoring" #type 有三种：monitoring: 报告中会要警告颜色区分 display：仅做数据展示，不区分颜色
+    show_in_table: false # 是否在资源类型详情表中展示，false 表示不展示,true 表示展示。一般在主机资源概览表中展示的就没必要再到资源类型详情的监控中展示了，如果全都在主机资源概览表中展示，表会很丑陋，所以增加了该参数来控制展示区域
+    description: "节点CPU使用率统计"
+    query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
+    threshold: 80
+    threshold_type: "greater"
+    unit: "%"
+    labels:
+      instance: "节点"
       # 其他指标...
 ```
 
@@ -70,7 +76,9 @@ metric_types:
 
 每个指标可以配置以下内容：
 
-- `name`: 指标名称
+- `name`: 指标名称  
+- `type`: 是否颜色告警  
+- `show_in_table`: 是否展示详情表
 - `description`: 指标描述
 - `query`: 用于表格显示的即时查询
 - `trend_query`: 用于图表显示的趋势查询
@@ -94,7 +102,7 @@ equal: 表示值必须等于阈值才被视为 "normal" 状态。
 1. 克隆仓库：
 
    ```bash
-   git clone https://github.com/kubehan/PromAI.git
+   git clone https://github.com/maolchen/PromAI.git
    cd PromAI
    ```
 2. 安装依赖：
@@ -120,7 +128,8 @@ equal: 表示值必须等于阈值才被视为 "normal" 状态。
 ### Docker 部署
 
 ```bash
-docker run -d --name PromAI -p 8091:8091 kubehan/promai:latest
+# docker 需要自己先打镜像
+docker run -d --name PromAI -p 8091:8091 promai/promai:latest
 ```
 
 ### Kubernetes 部署
@@ -142,70 +151,19 @@ go build -o PromAI main.go
 ./PromAI -config config/config.yaml
 ```
 
-# Prometheus Automated Inspection 未来新功能规划列表
+# 本项目主要二次开发点  
+- 增加了企业微信通知   
+- 指标展示按照配置文件配置顺序展示，重要的指标放在每个分组的前面  
+- 增加了主机资源综合概览表  
+- 页面风格调整  
+- 增加了巡检总结表格，可人工填写，可贴图（贴图不会上传到后端，我个人贴图是为了能打印为pdf，报告主要是输出pdf文档）  
 
-1. 多数据源支持
-2. 自定义仪表板
-3. 历史数据存储
-4. 智能告警
-5. API 接口
-6. 用户角色和权限管理
-7. 数据导出功能
-8. 集成 CI/CD 流程
-9. 可视化组件库
-10. 多语言支持
-11. 移动端支持
-12. 社区和插件支持
-13. 性能优化
-14. 用户反馈和建议收集
-15. xxx
+# 后续可能会做的  
+- 增加AI报告分析  
 
-## 贡献
+# 存在的一些问题   
+- 因为主要是为了输出巡检报告，增加了一些仅展示数据的指标在status中没做剔除，status整个执行会比较耗时且展示页面会有比较多的警告数据。  
 
-欢迎任何形式的贡献！请提交问题、建议或拉取请求。
-
-## 贡献者
-
-<!-- readme: collaborators,contributors -start -->
-<table>
-<tr>
-    <td align="center">
-        <a href="https://github.com/kubehan">
-            <img src="https://avatars.githubusercontent.com/u/69997301?v=4" width="100;" alt="kubehan"/>
-            <br />
-            <sub><b>Kubehan</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/junlintianxiazhifulinzhongguo">
-            <img src="https://avatars.githubusercontent.com/u/18591729?v=4" width="100;" alt="junlintianxiazhifulinzhongguo"/>
-            <br />
-            <sub><b>Junlintianxiazhifulinzhongguo</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/liushiju">
-            <img src="https://avatars.githubusercontent.com/u/34912508?v=4" width="100;" alt="liushiju"/>
-            <br />
-            <sub><b>Shiju Liu</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/wevsmy">
-            <img src="https://avatars.githubusercontent.com/u/26675374?v=4" width="100;" alt="wevsmy"/>
-            <br />
-            <sub><b>Wilson_wu</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/liaofan-0710">
-            <img src="https://avatars.githubusercontent.com/u/59794905?v=4" width="100;" alt="liaofan-0710"/>
-            <br />
-            <sub><b>了凡</b></sub>
-        </a>
-    </td></tr>
-</table>
-<!-- readme: collaborators,contributors -end -->
 
 ## 许可证
 
