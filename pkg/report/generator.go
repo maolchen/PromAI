@@ -302,7 +302,10 @@ func GenerateReport(data ReportData) (string, error) {
 
 	// 按主机聚合数据
 	hostMap := make(map[string]*HostSummary)
-	for _, group := range data.MetricGroups {
+	for groupType, group := range data.MetricGroups {
+		if groupType != "基础资源使用情况" {
+			continue
+		}
 		for metricName, metrics := range group.MetricsByName {
 			for _, m := range metrics {
 				var instance string
